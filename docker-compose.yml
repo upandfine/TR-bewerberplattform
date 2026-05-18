@@ -1,0 +1,116 @@
+# ============================================================
+#  Lernumgebung Fachinformatiker - docker compose
+#  Alle Zugangsdaten kommen aus der Datei .env
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  #  Datenbank (MariaDB)
+  # ----------------------------------------------------------
+  db:
+    image: mariadb:11
+    container_name: train-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${MARIADB_DATABASE}
+      MARIADB_USER: ${MARIADB_USER}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+    ports:
+      - "${DB_PORT}:3306"
+    volumes:
+      # Daten bleiben auch nach "down" erhalten
+      - db_data:/var/lib/mysql
+      # Alle .sql-Dateien hier werden beim ERSTEN Start automatisch ausgeführt
+      - ./sql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ----------------------------------------------------------
+  #  PHP 8.4 + Apache
+  #  Webroot: ./php/www  ->  http://localhost:8080
+  # ----------------------------------------------------------
+  php:
+    build: ./php
+    container_name: train-php
+    restart: unless-stopped
+    ports:
+      - "${PHP_PORT}:80"
+    volumes:
+      - ./php/www:/var/www/html
+    environment:
+      DB_HOST: db
+      DB_NAME: ${MARIADB_DATABASE}
+      DB_USER: ${MARIADB_USER}
+      DB_PASS: ${MARIADB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ----------------------------------------------------------
+  #  Python (Flask)
+  #  Code: ./python/app  ->  http://localhost:8001
+  # ----------------------------------------------------------
+  python:
+    build: ./python
+    container_name: train-python
+    restart: unless-stopped
+    ports:
+      - "${PYTHON_PORT}:8000"
+    volumes:
+      - ./python/app:/app
+    environment:
+      DB_HOST: db
+      DB_NAME: ${MARIADB_DATABASE}
+      DB_USER: ${MARIADB_USER}
+      DB_PASS: ${MARIADB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ----------------------------------------------------------
+  #  Node.js (Express)
+  #  Code: ./node/app  ->  http://localhost:3000
+  # ----------------------------------------------------------
+  node:
+    build: ./node
+    container_name: train-node
+    restart: unless-stopped
+    ports:
+      - "${NODE_PORT}:3000"
+    volumes:
+      - ./node/app:/app
+      # node_modules bleiben im Container (nicht vom Host überschrieben)
+      - /app/node_modules
+    environment:
+      DB_HOST: db
+      DB_NAME: ${MARIADB_DATABASE}
+      DB_USER: ${MARIADB_USER}
+      DB_PASS: ${MARIADB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ----------------------------------------------------------
+  #  phpMyAdmin  ->  http://localhost:8081
+  # ----------------------------------------------------------
+  phpmyadmin:
+    image: phpmyadmin:5
+    container_name: train-phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "${PHPMYADMIN_PORT}:80"
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      UPLOAD_LIMIT: 64M
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:

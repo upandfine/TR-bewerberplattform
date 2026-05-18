@@ -1,0 +1,15 @@
+# Zugangsdaten niemals einchecken
+.env
+
+# Persistente Datenbank-Daten
+db_data/
+
+# Abhängigkeiten der App-Container
+node/app/node_modules/
+
+# Betriebssystem-Müll
+.DS_Store
+Thumbs.db
+
+# Lokale Editor-/Tool-Einstellungen
+.claude/
