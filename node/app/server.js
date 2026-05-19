@@ -1,34 +1,47 @@
-// ============================================================
-//  Demo-App: zeigt, dass Node.js/Express läuft und die DB
-//  erreichbar ist. Eigenen Code hier erweitern.
-//  Änderungen werden nach "docker compose restart node"
-//  übernommen.
-// ============================================================
+// HTTP-Schicht: nur Request/Response-Mapping, keine Fachlogik.
+//
+//   GET  /                  -> kleiner Health-Check
+//   POST /api/bewerbungen   -> Bewerbung einreichen
+//   GET  /api/bewerbungen   -> Bewerbungen auflisten (?status=...)
 
 const express = require("express");
-const mysql = require("mysql2/promise");
+const db = require("./db");
+const { BewerbungService } = require("./service");
+const { MysqlBewerbungRepository } = require("./repository");
+const { ValidationError } = require("./errors");
 
 const app = express();
+app.use(express.json());
 
-async function dbStatus() {
-  try {
-    const conn = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASS,
-      database: process.env.DB_NAME,
-    });
-    const [rows] = await conn.query("SELECT VERSION() AS v");
-    await conn.end();
-    return `<p style="color:green">Datenbank-Verbindung OK - MariaDB ${rows[0].v}</p>`;
-  } catch (e) {
-    return `<p style="color:red">Keine DB-Verbindung: ${e.message}</p>`;
-  }
+async function service() {
+  return new BewerbungService(new MysqlBewerbungRepository(await db.connect()));
 }
 
-app.get("/", async (req, res) => {
-  const status = await dbStatus();
-  res.send(`<h1>Node.js / Express läuft </h1>${status}`);
+app.get("/", (_req, res) => {
+  res.send("<h1>Node.js / Express läuft</h1><p>API unter /api/bewerbungen</p>");
+});
+
+app.post("/api/bewerbungen", async (req, res) => {
+  try {
+    const result = await (await service()).einreichen(req.body ?? {});
+    res.status(201).json(result);
+  } catch (e) {
+    if (e instanceof ValidationError) {
+      return res.status(400).json({ fehler: e.message, details: e.errors });
+    }
+    if (e && e.errno === 1452) {
+      return res.status(422).json({ fehler: "Angegebene stelle_id existiert nicht." });
+    }
+    if (e && e.errno === 1062) {
+      return res.status(409).json({ fehler: "Vorgangsnummer-Kollision, bitte erneut senden." });
+    }
+    res.status(500).json({ fehler: "Datenbankfehler." });
+  }
+});
+
+app.get("/api/bewerbungen", async (req, res) => {
+  const status = req.query.status ?? null;
+  res.status(200).json({ bewerbungen: await (await service()).liste(status) });
 });
 
 // 0.0.0.0 ist wichtig, damit der Container von außen erreichbar ist

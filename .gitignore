@@ -6,6 +6,11 @@ db_data/
 
 # Abhängigkeiten der App-Container
 node/app/node_modules/
+php/vendor/
+
+# Python-Bytecode-Cache
+__pycache__/
+*.pyc
 
 # Betriebssystem-Müll
 .DS_Store
