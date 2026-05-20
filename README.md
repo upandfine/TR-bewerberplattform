@@ -128,9 +128,16 @@ Für den laufenden Betrieb gibt es das Helfer-Skript `run-sql.sh`:
 3. Ausführen: `./run-sql.sh sql/scripts/meins.sql`
 4. Ergebnis in phpMyAdmin (http://localhost:8081) kontrollieren
 
-> Windows-Hinweis: Wenn `./run-sql.sh` nicht startet, in der
-> PowerShell mit `bash run-sql.sh sql/scripts/meins.sql` ausführen
-> (Git Bash / WSL vorausgesetzt).
+> **Windows-Hinweis (PowerShell):** Statt `./run-sql.sh` das
+> mitgelieferte PowerShell-Pendant nutzen – funktioniert in
+> Windows PowerShell 5.1 und PowerShell 7+:
+>
+> ```powershell
+> .\run-sql.ps1 sql\scripts\meins.sql
+> ```
+>
+> Alternativ über Git Bash mit dem normalen Bash-Skript:
+> `bash run-sql.sh sql/scripts/meins.sql`.
 
 ### Massendaten zum Üben (Demo-Datensatz)
 
@@ -353,7 +360,8 @@ docker compose down -v
 ├── .env.example          # Vorlage für .env
 ├── .gitignore
 ├── docker-compose.yml    # Definition aller Container
-├── run-sql.sh            # Helfer: SQL-Datei auf der DB ausführen
+├── run-sql.sh            # Helfer (macOS/Linux/Git Bash): SQL auf der DB ausführen
+├── run-sql.ps1           # Helfer (Windows PowerShell): dasselbe für PS 5.1 / 7+
 ├── README.md
 ├── php/
 │   ├── Dockerfile
