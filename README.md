@@ -20,6 +20,7 @@ damit es ohne lange Einrichtung läuft.
 | `kotlin`     | Kotlin 2 / Ktor        | http://localhost:8084           |
 | `go`         | Go 1.23 / chi          | http://localhost:8085           |
 | `ruby`       | Ruby 3.3 / Sinatra     | http://localhost:8086           |
+| `vue`        | Vue 3 (Vite + nginx)   | http://localhost:5173           |
 | `phpmyadmin` | phpMyAdmin             | http://localhost:8081           |
 | `nocodb`     | NocoDB (Daten-UI)      | http://localhost:8090           |
 
@@ -63,6 +64,8 @@ Danach im Browser öffnen:
 - PHP:        http://localhost:8080
 - Python:     http://localhost:8001
 - Node.js:    http://localhost:3000
+- .NET:       http://localhost:8082
+- Vue-Form:   http://localhost:5173
 - phpMyAdmin: http://localhost:8081
 
 Jede Demo-Seite zeigt grün an, ob die Datenbank-Verbindung steht.
@@ -463,6 +466,13 @@ docker compose down -v
 │   ├── Rakefile
 │   ├── app/             # Sinatra-App (config.ru, app.rb, service.rb, ...)
 │   └── tests/           # Minitest
+├── vue/
+│   ├── Dockerfile           # multi-stage: vite build -> nginx
+│   ├── nginx.conf
+│   ├── index.html
+│   ├── vite.config.js
+│   ├── package.json
+│   └── src/                 # App.vue, main.js, styles.css
 └── sql/
     ├── init/init_bewerbung.sql  # Schema + Demo, automatisch beim 1. Start
     └── scripts/
@@ -470,4 +480,39 @@ docker compose down -v
         ├── demo-seed.sql    # ~500 Bewerber + alle Tabellen befüllen
         └── demo-clear.sql   # Demo-Daten wieder entfernen
 ```
+
+---
+
+## 7. Vue-Formular (`vue`)
+
+Kleine Single-Page-App (Vue 3 + Vite, im Container von nginx ausgeliefert),
+mit der man eine Bewerbung an eines der vier Backends schicken kann.
+
+Aufruf: <http://localhost:5173>
+
+Im Formular auswählbar:
+
+- **Backend-Typ:** PHP, Python, Node oder .NET. Damit weiß die App, ob
+  sie an `/api.php` (PHP) oder `/api/bewerbungen` (alle anderen) schicken muss.
+- **Basis-URL:** z.B. `http://localhost:8080`. Lässt sich frei ändern,
+  falls Ports in `.env` verschoben wurden.
+
+Felder gemäß DB-Schema:
+
+| Feld        | Pflicht | Hinweis                              |
+|-------------|---------|--------------------------------------|
+| Vorname     | ja      | max. 60 Zeichen                      |
+| Nachname    | ja      | max. 60 Zeichen                      |
+| E-Mail      | ja      | UNIQUE auf `bewerber.email`          |
+| Telefon     | nein    | max. 30 Zeichen                      |
+| Stellen-ID  | ja      | FK auf `stellenangebot.id`           |
+| Bemerkung   | nein    | max. 500 Zeichen                     |
+
+Bei Erfolg zeigt das Formular `vorgangs_nr`, `bewerbung_id`
+und `bewerber_id` an. Fehler (Validierung, FK, Duplikat) werden
+mit HTTP-Status und Details ausgegeben.
+
+> CORS: Alle vier Backends senden `Access-Control-Allow-Origin: *`,
+> damit der Browser den Cross-Origin-Request vom Vue-Container
+> (Port 5173) auf das Backend (8080/8001/3000/8082) erlaubt.
 # TR-bewerberplattform

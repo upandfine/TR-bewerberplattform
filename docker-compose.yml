@@ -143,6 +143,19 @@ services:
         condition: service_healthy
 
   # ----------------------------------------------------------
+  #  Vue 3 (Vite + nginx)
+  #  Code: ./vue  ->  http://localhost:5173
+  #  Kleines Bewerbungs-Formular, kann zur Laufzeit jedes der
+  #  vier Backends (PHP/Python/Node/.NET) ansprechen.
+  # ----------------------------------------------------------
+  vue:
+    build: ./vue
+    container_name: train-vue
+    restart: unless-stopped
+    ports:
+      - "${VUE_PORT}:80"
+
+  # ----------------------------------------------------------
   #  .NET 9 (ASP.NET Core Minimal API)
   #  Code: ./dotnet  ->  http://localhost:8082
   # ----------------------------------------------------------

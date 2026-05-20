@@ -24,7 +24,13 @@ builder.Services.AddScoped<IBewerbungRepository>(sp =>
     new MySqlBewerbungRepository(sp.GetRequiredService<MySqlConnection>()));
 builder.Services.AddScoped<BewerbungService>();
 
+// CORS: erlaubt dem Vue-Frontend (anderer Origin) den Zugriff.
+builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
+    p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
+
 var app = builder.Build();
+
+app.UseCors();
 
 app.MapGet("/", () => Results.Content(
     "<h1>ASP.NET Core läuft</h1><p>API unter /api/bewerbungen</p>",

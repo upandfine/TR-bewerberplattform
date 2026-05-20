@@ -17,6 +17,21 @@ from service import BewerbungService
 app = Flask(__name__)
 
 
+# CORS: erlaubt dem Vue-Frontend (anderer Origin) den Zugriff.
+@app.after_request
+def _add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Max-Age"] = "86400"
+    return response
+
+
+@app.route("/api/bewerbungen", methods=["OPTIONS"])
+def _cors_preflight():
+    return ("", 204)
+
+
 def _service() -> BewerbungService:
     return BewerbungService(PyMySQLBewerbungRepository(db.connect()))
 
