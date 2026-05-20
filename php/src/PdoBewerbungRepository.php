@@ -39,6 +39,7 @@ final class PdoBewerbungRepository implements BewerbungRepositoryInterface
             ':telefon'  => $bewerber['telefon'] ?? null,
         ]);
 
+
         return (int) $this->pdo->lastInsertId();
     }
 

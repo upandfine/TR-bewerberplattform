@@ -15,6 +15,7 @@ damit es ohne lange Einrichtung läuft.
 | `php`        | PHP 8.4 + Apache   | http://localhost:8080           |
 | `python`     | Python 3.12 (Flask)| http://localhost:8001           |
 | `node`       | Node.js 22 (Express)| http://localhost:3000          |
+| `dotnet`     | .NET 9 / ASP.NET Core| http://localhost:8082         |
 | `phpmyadmin` | phpMyAdmin         | http://localhost:8081           |
 | `nocodb`     | NocoDB (Daten-UI)  | http://localhost:8090           |
 
@@ -274,19 +275,20 @@ als Board (sehr anschaulich).
 
 ---
 
-## 6c. Derselbe Durchstich in Python und Node
+## 6c. Derselbe Durchstich in Python, Node und C#
 
 Exakt dieselbe Architektur und API wie 6a – einmal in
-**Python/Flask** (`python/app/`) und einmal in **Node.js/Express**
-(`node/app/`), jeweils gegen dieselbe `bewerbung_db`. Gut zum
-Sprachvergleich in der Schulung.
+**Python/Flask** (`python/app/`), einmal in **Node.js/Express**
+(`node/app/`) und einmal in **C# / ASP.NET Core 9**
+(`dotnet/src/Bewerbung.Api/`), jeweils gegen dieselbe
+`bewerbung_db`. Ideal zum Sprachvergleich in der Schulung.
 
-| Schicht | Python (`python/app/`) | Node (`node/app/`) |
-|---|---|---|
-| HTTP | `app.py` | `server.js` |
-| Use-Case | `service.py` | `service.js` |
-| Persistenz | `repository.py` | `repository.js` |
-| Naht (Interface) | `BewerbungRepository` (Protocol) | Duck-Typing / Fake |
+| Schicht | Python (`python/app/`) | Node (`node/app/`) | C# (`dotnet/src/Bewerbung.Api/`) |
+|---|---|---|---|
+| HTTP | `app.py` | `server.js` | `Program.cs` |
+| Use-Case | `service.py` | `service.js` | `BewerbungService.cs` |
+| Persistenz | `repository.py` | `repository.js` | `MySqlBewerbungRepository.cs` |
+| Naht (Interface) | `BewerbungRepository` (Protocol) | Duck-Typing / Fake | `IBewerbungRepository` |
 
 Endpunkte (identischer JSON-Vertrag, snake_case-Ausgabe):
 
@@ -302,6 +304,12 @@ curl -X POST http://localhost:3000/api/bewerbungen \
   -H 'Content-Type: application/json' \
   -d '{"vorname":"Erika","nachname":"Mustermann","email":"e@example.com","stelle_id":1}'
 curl http://localhost:3000/api/bewerbungen
+
+# C# / .NET 9  ->  Port 8082
+curl -X POST http://localhost:8082/api/bewerbungen \
+  -H 'Content-Type: application/json' \
+  -d '{"vorname":"Erika","nachname":"Mustermann","email":"e@example.com","stelle_id":1}'
+curl http://localhost:8082/api/bewerbungen
 ```
 
 Tests (Unit ohne DB, Integration gegen echte DB, API über HTTP):
@@ -312,10 +320,13 @@ docker compose exec python python -m pytest -q tests
 
 # Node: eingebauter Test-Runner
 docker compose exec node npm test
+
+# C#: xUnit
+docker compose exec -w /work dotnet dotnet test tests/Bewerbung.Tests --nologo
 ```
 
 > Hinweis: Code-Änderungen werden nach
-> `docker compose restart python` bzw. `node` aktiv.
+> `docker compose restart python` / `node` / `dotnet` aktiv.
 
 ---
 
@@ -372,9 +383,12 @@ docker compose down -v
 │   └── app/app.py        # Python-Demo
 ├── node/
 │   ├── Dockerfile
-│   └── app/
-│       ├── package.json
-│       └── server.js     # Node-Demo
+│   ├── app/              # Express-API (siehe 6c)
+│   └── tests/            # node --test
+├── dotnet/
+│   ├── Dockerfile
+│   ├── src/Bewerbung.Api/   # ASP.NET Core Minimal API (siehe 6c)
+│   └── tests/Bewerbung.Tests/  # xUnit
 └── sql/
     ├── init/init_bewerbung.sql  # Schema + Demo, automatisch beim 1. Start
     └── scripts/

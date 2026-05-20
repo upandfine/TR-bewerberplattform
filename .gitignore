@@ -12,6 +12,10 @@ php/vendor/
 __pycache__/
 *.pyc
 
+# .NET build-Output
+dotnet/**/bin/
+dotnet/**/obj/
+
 # Betriebssystem-Müll
 .DS_Store
 Thumbs.db
