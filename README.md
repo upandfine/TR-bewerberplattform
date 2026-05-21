@@ -389,6 +389,93 @@ docker compose exec -w /app ruby bundle exec rake test
 
 ---
 
+## 6d. Musterlösung Stellenangebot (`/api_stellen`)
+
+Zweiter Durchstich – diesmal für **Stellenangebote** statt
+Bewerbungen. Wieder drei Schichten, in allen vier Backend-Sprachen,
+gegen dieselbe DB.
+
+| Schicht | PHP | Python | Node | C# |
+|---|---|---|---|---|
+| HTTP | `php/www/api_stellen.php` | `python/app/app.py` (`/api_stellen`) | `node/app/server.js` (`/api_stellen`) | `dotnet/src/Bewerbung.Api/Program.cs` (`/api_stellen`) |
+| Use-Case | `php/src/StellenangebotService.php` | `python/app/stellen_service.py` | `node/app/stellen-service.js` | `dotnet/src/Bewerbung.Api/StellenangebotService.cs` |
+| Persistenz | `php/src/PdoStellenangebotRepository.php` | `python/app/stellen_repository.py` | `node/app/stellen-repository.js` | `dotnet/src/Bewerbung.Api/MySqlStellenangebotRepository.cs` |
+| Naht (Interface) | `StellenangebotRepositoryInterface` | `StellenangebotRepository` (Protocol) | Duck-Typing / Fake | `IStellenangebotRepository` |
+
+Drei Lernziele, in allen vier Sprachen einheitlich umgesetzt:
+
+1. **Drei Schichten** – HTTP, Use-Case, Persistenz strikt getrennt.
+   Der Service-Layer kennt keine DB- oder HTTP-Begriffe und ist
+   ohne Datenbank unit-testbar.
+2. **Prepared Statements** – jedes `INSERT`/`SELECT` benutzt
+   parametrisierte Statements (`?` bzw. `:name` / `@name`).
+   Integrations-Test `Prepared_Statement_verhindert_SqlInjection`
+   schickt einen klassischen `'; DROP TABLE …; --`-Titel und prüft,
+   dass die Tabelle danach noch existiert.
+3. **Geschäftsregel im Service** – eine neue Stelle startet
+   **immer** mit `status = ENTWURF`. Ein vom Aufrufer mitgeschickter
+   `status` wird bewusst verworfen, damit die Regel nicht von der
+   DB-`DEFAULT`-Klausel abhängt und auch mit einem anderen
+   Persistenz-Adapter gilt.
+
+### Endpunkte (identischer JSON-Vertrag, snake_case)
+
+```bash
+# PHP   -> Port 8080
+curl -X POST http://localhost:8080/api_stellen.php \
+  -H 'Content-Type: application/json' \
+  -d '{"titel":"Senior Backend","art":"FESTANSTELLUNG"}'
+curl http://localhost:8080/api_stellen.php
+curl 'http://localhost:8080/api_stellen.php?status=ENTWURF'
+
+# Python -> Port 8001
+curl -X POST http://localhost:8001/api_stellen \
+  -H 'Content-Type: application/json' \
+  -d '{"titel":"Werkstudent:in Daten","art":"WERKSTUDENT"}'
+curl http://localhost:8001/api_stellen
+
+# Node   -> Port 3000
+curl -X POST http://localhost:3000/api_stellen \
+  -H 'Content-Type: application/json' \
+  -d '{"titel":"Azubi:ne","art":"AZUBI"}'
+curl http://localhost:3000/api_stellen
+
+# .NET   -> Port 8082
+curl -X POST http://localhost:8082/api_stellen \
+  -H 'Content-Type: application/json' \
+  -d '{"titel":"Praktikum Frontend","art":"PRAKTIKUM"}'
+curl http://localhost:8082/api_stellen
+```
+
+POST liefert `{ id, titel, art, status }` mit `status = "ENTWURF"`,
+auch wenn der Request einen anderen Status mitgesendet hat.
+
+### Tests (Unit + Integration + API)
+
+```bash
+# PHP
+docker compose exec php php vendor/bin/phpunit --filter Stellen --testdox
+
+# Python
+docker compose exec python python -m pytest -q tests/test_stellen_service.py \
+                                                tests/test_stellen_repository_integration.py \
+                                                tests/test_stellen_api.py
+
+# Node
+docker compose exec node node --test tests/stellen-service.test.js \
+                                      tests/stellen-repository.integration.test.js \
+                                      tests/stellen-api.test.js
+
+# C# / .NET
+docker compose exec -w /work dotnet dotnet test tests/Bewerbung.Tests \
+  --filter "FullyQualifiedName~Stellen" --nologo
+```
+
+Hinweis: Nach Code-Änderungen in Python/Node/.NET kurz
+`docker compose restart python` / `node` / `dotnet`. PHP lädt sofort.
+
+---
+
 ## 7. Nützliche Befehle
 
 ```bash

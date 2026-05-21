@@ -23,6 +23,9 @@ builder.Services.AddScoped(_ =>
 builder.Services.AddScoped<IBewerbungRepository>(sp =>
     new MySqlBewerbungRepository(sp.GetRequiredService<MySqlConnection>()));
 builder.Services.AddScoped<BewerbungService>();
+builder.Services.AddScoped<IStellenangebotRepository>(sp =>
+    new MySqlStellenangebotRepository(sp.GetRequiredService<MySqlConnection>()));
+builder.Services.AddScoped<StellenangebotService>();
 
 // CORS: erlaubt dem Vue-Frontend (anderer Origin) den Zugriff.
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
@@ -71,6 +74,40 @@ app.MapGet("/api/bewerbungen", async (string? status, BewerbungService svc) =>
 {
     var liste = await svc.ListeAsync(status);
     return Results.Json(new { bewerbungen = liste });
+});
+
+app.MapPost("/api_stellen", async (StelleHttpInput input, StellenangebotService svc) =>
+{
+    try
+    {
+        var result = await svc.AnlegenAsync(input);
+        return Results.Json(result, statusCode: 201);
+    }
+    catch (ValidationException ex)
+    {
+        return Results.Json(
+            new { fehler = ex.Message, details = ex.Errors },
+            statusCode: 400);
+    }
+    catch (MySqlException)
+    {
+        return Results.Json(new { fehler = "Datenbankfehler." }, statusCode: 500);
+    }
+});
+
+app.MapGet("/api_stellen", async (string? status, StellenangebotService svc) =>
+{
+    try
+    {
+        var liste = await svc.ListeAsync(status);
+        return Results.Json(new { stellen = liste });
+    }
+    catch (ValidationException ex)
+    {
+        return Results.Json(
+            new { fehler = ex.Message, details = ex.Errors },
+            statusCode: 400);
+    }
 });
 
 app.Run();

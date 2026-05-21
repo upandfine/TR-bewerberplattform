@@ -3,11 +3,15 @@
 //   GET  /                  -> kleiner Health-Check
 //   POST /api/bewerbungen   -> Bewerbung einreichen
 //   GET  /api/bewerbungen   -> Bewerbungen auflisten (?status=...)
+//   POST /api_stellen       -> Stelle anlegen (Status = ENTWURF)
+//   GET  /api_stellen       -> Stellen auflisten (?status=...)
 
 const express = require("express");
 const db = require("./db");
 const { BewerbungService } = require("./service");
 const { MysqlBewerbungRepository } = require("./repository");
+const { StellenangebotService } = require("./stellen-service");
+const { MysqlStellenangebotRepository } = require("./stellen-repository");
 const { ValidationError } = require("./errors");
 
 const app = express();
@@ -25,6 +29,12 @@ app.use((req, res, next) => {
 
 async function service() {
   return new BewerbungService(new MysqlBewerbungRepository(await db.connect()));
+}
+
+async function stellenService() {
+  return new StellenangebotService(
+    new MysqlStellenangebotRepository(await db.connect())
+  );
 }
 
 app.get("/", (_req, res) => {
@@ -52,6 +62,31 @@ app.post("/api/bewerbungen", async (req, res) => {
 app.get("/api/bewerbungen", async (req, res) => {
   const status = req.query.status ?? null;
   res.status(200).json({ bewerbungen: await (await service()).liste(status) });
+});
+
+app.post("/api_stellen", async (req, res) => {
+  try {
+    const result = await (await stellenService()).anlegen(req.body ?? {});
+    res.status(201).json(result);
+  } catch (e) {
+    if (e instanceof ValidationError) {
+      return res.status(400).json({ fehler: e.message, details: e.errors });
+    }
+    res.status(500).json({ fehler: "Datenbankfehler." });
+  }
+});
+
+app.get("/api_stellen", async (req, res) => {
+  try {
+    const status = req.query.status ?? null;
+    const stellen = await (await stellenService()).liste(status);
+    res.status(200).json({ stellen });
+  } catch (e) {
+    if (e instanceof ValidationError) {
+      return res.status(400).json({ fehler: e.message, details: e.errors });
+    }
+    res.status(500).json({ fehler: "Datenbankfehler." });
+  }
 });
 
 // 0.0.0.0 ist wichtig, damit der Container von außen erreichbar ist

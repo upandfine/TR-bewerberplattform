@@ -4,6 +4,8 @@ Endpunkte:
     GET  /                  -> kleiner Health-Check
     POST /api/bewerbungen   -> Bewerbung einreichen
     GET  /api/bewerbungen   -> Bewerbungen auflisten (?status=...)
+    POST /api_stellen       -> Stelle anlegen (Status startet als ENTWURF)
+    GET  /api_stellen       -> Stellen auflisten (?status=...)
 """
 
 import pymysql
@@ -13,6 +15,8 @@ import db
 from errors import ValidationError
 from repository import PyMySQLBewerbungRepository
 from service import BewerbungService
+from stellen_repository import PyMySQLStellenangebotRepository
+from stellen_service import StellenangebotService
 
 app = Flask(__name__)
 
@@ -28,12 +32,17 @@ def _add_cors_headers(response):
 
 
 @app.route("/api/bewerbungen", methods=["OPTIONS"])
+@app.route("/api_stellen", methods=["OPTIONS"])
 def _cors_preflight():
     return ("", 204)
 
 
 def _service() -> BewerbungService:
     return BewerbungService(PyMySQLBewerbungRepository(db.connect()))
+
+
+def _stellen_service() -> StellenangebotService:
+    return StellenangebotService(PyMySQLStellenangebotRepository(db.connect()))
 
 
 @app.get("/")
@@ -63,6 +72,28 @@ def einreichen():
 def liste():
     status = request.args.get("status")
     return jsonify({"bewerbungen": _service().liste(status)}), 200
+
+
+@app.post("/api_stellen")
+def stelle_anlegen():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"fehler": "Body muss gueltiges JSON sein."}), 400
+    try:
+        return jsonify(_stellen_service().anlegen(data)), 201
+    except ValidationError as e:
+        return jsonify({"fehler": str(e), "details": e.errors}), 400
+    except pymysql.err.MySQLError:
+        return jsonify({"fehler": "Datenbankfehler."}), 500
+
+
+@app.get("/api_stellen")
+def stellen_liste():
+    status = request.args.get("status")
+    try:
+        return jsonify({"stellen": _stellen_service().liste(status)}), 200
+    except ValidationError as e:
+        return jsonify({"fehler": str(e), "details": e.errors}), 400
 
 
 if __name__ == "__main__":
