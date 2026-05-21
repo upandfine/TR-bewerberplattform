@@ -44,6 +44,11 @@ docker --version
 docker compose version
 ```
 
+> **`git` und `curl` werden NICHT lokal gebraucht.** Wer sie auf dem
+> Rechner nicht installiert hat (typisch an Schulungs-PCs ohne
+> Admin-Rechte), nutzt den mitgelieferten Tools-Container – siehe
+> [Abschnitt 4a](#4a-werkzeuge-ohne-installation-git-curl).
+
 ---
 
 ## 3. Schnellstart
@@ -94,7 +99,89 @@ Benutzer `root` mit `MARIADB_ROOT_PASSWORD`
 
 ---
 
-## 5. SQL / DDL-Skripte ausführen
+## 4a. Werkzeuge ohne Installation (`git`, `curl`)
+
+Für Rechner ohne `git`/`curl` (z. B. Schulungs-PCs ohne
+Admin-Rechte) liegt im Ordner `tools/` ein kleiner Mini-Container,
+der beides mitbringt. Der Container läuft permanent mit; jeder
+Befehl ist ein `docker compose exec` – das geht in etwa
+50 Millisekunden, also gefühlt wie nativ.
+
+### Einmalige Einrichtung
+
+1. In der `.env` Name und Mail eintragen, mit denen `git commit`
+   später als Autor signiert:
+
+   ```
+   GIT_USER_NAME=Max Muster
+   GIT_USER_EMAIL=max.muster@example.local
+   ```
+
+2. Tools-Container starten (zusammen mit allem anderen):
+
+   ```bash
+   docker compose up -d
+   ```
+
+### Pro Terminal-Sitzung
+
+Damit `git ...` und `curl ...` aus jedem Verzeichnis im Projekt
+funktionieren, einmal je Fenster aktivieren:
+
+**Windows (CMD):**
+
+```cmd
+tools\activate
+```
+
+**Windows (PowerShell):**
+
+```powershell
+. .\tools\activate.ps1
+```
+
+> Der Punkt vor `.\tools\...` ist wichtig (sog. „Dot-Sourcing") –
+> sonst wirkt das Script nicht in der aktuellen Sitzung.
+
+Anschließend funktionieren z. B.:
+
+```cmd
+git status
+git add .
+git commit -m "erste Aenderung"
+curl http://localhost:8080/api/bewerbungen
+```
+
+`curl http://localhost:8080/...` trifft trotz Container-Umweg den
+Webserver auf dem Host – `localhost` und `127.0.0.1` werden
+automatisch auf den Host umgeschrieben.
+
+### Push zu GitHub/GitLab (später)
+
+Pull, Clone und lokale Commits gehen sofort. Sobald `git push`
+gebraucht wird:
+
+1. Persönlichen Access-Token bei GitHub/GitLab erzeugen
+   (Recht: nur Push aufs eigene Übungs-Repo).
+2. Im Tools-Container einmalig den Credential-Helper aktivieren –
+   die Zugangsdaten bleiben im Volume `tools_home` erhalten:
+
+   ```cmd
+   git config --global credential.helper store
+   git push
+   ```
+
+   Beim ersten Push fragt git nach Benutzername und Token; danach
+   merkt es sich beides.
+
+### Fehlerbild „Container läuft nicht"
+
+```
+service "tools" is not running
+```
+
+→ `docker compose up -d` ausführen (oder neu starten:
+`docker compose restart tools`).
 
 Es gibt zwei Wege – beide nutzen den Ordner `sql/`.
 

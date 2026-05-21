@@ -250,6 +250,36 @@ services:
         condition: service_healthy
 
   # ----------------------------------------------------------
+  #  Tools (git + curl) fuer Teilnehmer ohne lokale Tools
+  #  Permanent laufender Mini-Container. Aufruf ueber die
+  #  Wrapper-Skripte in ./tools (siehe README, Abschnitt
+  #  "Werkzeuge ohne Installation").
+  # ----------------------------------------------------------
+  tools:
+    build: ./tools
+    container_name: train-tools
+    restart: unless-stopped
+    working_dir: /work
+    volumes:
+      # Komplettes Projekt in den Container, damit "git status"
+      # & Co. die Arbeitskopie der Teilnehmer sehen.
+      - .:/work
+      # /root persistent halten: hier landen .gitconfig-Eintraege,
+      # gespeicherte HTTPS-Credentials, known_hosts usw.
+      - tools_home:/root
+    environment:
+      # Werden bei jedem Commit als Autor/Committer verwendet.
+      # In der .env eintragen, siehe .env.example.
+      GIT_AUTHOR_NAME: ${GIT_USER_NAME:-Teilnehmer}
+      GIT_AUTHOR_EMAIL: ${GIT_USER_EMAIL:-teilnehmer@example.local}
+      GIT_COMMITTER_NAME: ${GIT_USER_NAME:-Teilnehmer}
+      GIT_COMMITTER_EMAIL: ${GIT_USER_EMAIL:-teilnehmer@example.local}
+    extra_hosts:
+      # Damit "curl http://localhost:8080" im Container den Host
+      # erreicht (siehe tools/curl-rewrite.sh).
+      - "host.docker.internal:host-gateway"
+
+  # ----------------------------------------------------------
   #  Ruby 3.3 (Sinatra)
   #  Code: ./ruby  ->  http://localhost:8086
   # ----------------------------------------------------------
@@ -277,3 +307,4 @@ services:
 volumes:
   db_data:
   nocodb_data:
+  tools_home:

@@ -1,0 +1,19 @@
+# Globale git-Konfiguration im Tools-Container.
+# Wird zur Build-Zeit nach /etc/gitconfig kopiert.
+
+[color]
+    ui = always
+
+[core]
+    pager = cat
+    autocrlf = input
+
+[init]
+    defaultBranch = main
+
+[safe]
+    # Bind-Mount /work gehoert dem Host-Benutzer, im Container
+    # laeuft alles als root - sonst meckert git wegen "dubious
+    # ownership in repository".
+    directory = /work
+    directory = /work/*
