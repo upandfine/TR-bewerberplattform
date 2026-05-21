@@ -1,53 +1,37 @@
 <script setup>
-import { computed, reactive, ref } from "vue";
+import { reactive, ref } from "vue";
 
 const props = defineProps({
-  basisUrl: { type: String, required: true },
+  endpoint: { type: String, required: true },
 });
 
 const ARTEN = ["FESTANSTELLUNG", "AZUBI", "MINIJOB", "WERKSTUDENT", "PRAKTIKUM"];
-const STATUS = ["ENTWURF", "VEROEFFENTLICHT", "GESCHLOSSEN", "ARCHIVIERT"];
-
-const pfad = ref("/api/stellenangebote");
-
-const endpoint = computed(() => {
-  const base = (props.basisUrl || "").replace(/\/+$/, "");
-  const p = pfad.value.startsWith("/") ? pfad.value : "/" + pfad.value;
-  return base + p;
-});
 
 const form = reactive({
   titel: "",
   beschreibung: "",
   art: "FESTANSTELLUNG",
-  status: "ENTWURF",
-  veroeffentlicht_am: "",
 });
 
 const submitting = ref(false);
 const success = ref(null);
 const error = ref(null);
 
-function toIsoSeconds(local) {
-  if (!local) return null;
-  return local.length === 16 ? `${local}:00` : local;
-}
-
 async function submit() {
   submitting.value = true;
   success.value = null;
   error.value = null;
 
+  // Status wird absichtlich NICHT gesendet - das Backend setzt
+  // gemaess Geschaeftsregel immer ENTWURF.
   const payload = {
     titel: form.titel.trim(),
     beschreibung: form.beschreibung.trim() || null,
     art: form.art,
-    status: form.status,
-    veroeffentlicht_am: toIsoSeconds(form.veroeffentlicht_am),
   };
 
   try {
-    const res = await fetch(endpoint.value, {
+    const res = await fetch(props.endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -76,7 +60,7 @@ async function submit() {
       status: 0,
       message:
         "Netzwerkfehler oder CORS-Problem. " +
-        "Prüfe, ob das Backend läuft, der Endpoint-Pfad stimmt und die CORS-Header gesetzt sind.",
+        "Pruefe, ob das Backend laeuft und die CORS-Header gesetzt sind.",
       details: [String(e?.message || e)],
     };
   } finally {
@@ -88,8 +72,6 @@ function reset() {
   form.titel = "";
   form.beschreibung = "";
   form.art = "FESTANSTELLUNG";
-  form.status = "ENTWURF";
-  form.veroeffentlicht_am = "";
   success.value = null;
   error.value = null;
 }
@@ -98,15 +80,10 @@ function reset() {
 <template>
   <form class="card" @submit.prevent="submit">
     <h2>Stellenangebot anlegen</h2>
-
-    <label>
-      <span class="req">Endpoint-Pfad</span>
-      <input v-model="pfad" placeholder="/api/stellenangebote" spellcheck="false" />
-    </label>
-    <p class="muted" style="margin-top: 0.5rem;">
+    <p class="muted" style="margin-top: 0.25rem;">
       Endpoint: <span class="endpoint-preview">{{ endpoint }}</span>
       <br />
-      <em>API-Pfad ist im Backend noch nicht final &mdash; hier später ersetzen.</em>
+      <em>Neue Stellen starten gemaess Geschaeftsregel immer als <code>ENTWURF</code>.</em>
     </p>
 
     <div class="grid grid-2" style="margin-top: 1rem;">
@@ -120,18 +97,6 @@ function reset() {
         <select v-model="form.art">
           <option v-for="a in ARTEN" :key="a" :value="a">{{ a }}</option>
         </select>
-      </label>
-
-      <label>
-        <span class="req">Status</span>
-        <select v-model="form.status">
-          <option v-for="s in STATUS" :key="s" :value="s">{{ s }}</option>
-        </select>
-      </label>
-
-      <label>
-        <span>Veröffentlicht am</span>
-        <input v-model="form.veroeffentlicht_am" type="datetime-local" />
       </label>
     </div>
 
@@ -154,8 +119,13 @@ function reset() {
     </div>
 
     <div v-if="success" class="alert alert-success">
-      <strong>Stellenangebot angelegt.</strong>
-      <pre style="margin: 0.5rem 0 0; white-space: pre-wrap;">{{ JSON.stringify(success, null, 2) }}</pre>
+      <strong>Stelle angelegt.</strong>
+      <ul>
+        <li>ID: <code>{{ success.id }}</code></li>
+        <li>Titel: <code>{{ success.titel }}</code></li>
+        <li>Art: <code>{{ success.art }}</code></li>
+        <li>Status: <code>{{ success.status }}</code></li>
+      </ul>
     </div>
 
     <div v-if="error" class="alert alert-error">
