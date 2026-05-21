@@ -3,10 +3,30 @@ import { computed, reactive, ref } from "vue";
 import StellenangebotForm from "./StellenangebotForm.vue";
 
 const BACKENDS = {
-  php: { label: "PHP / Apache", defaultBase: "http://localhost:8080", path: "/api.php" },
-  python: { label: "Python / Flask", defaultBase: "http://localhost:8001", path: "/api/bewerbungen" },
-  node: { label: "Node.js / Express", defaultBase: "http://localhost:3000", path: "/api/bewerbungen" },
-  dotnet: { label: ".NET / ASP.NET Core", defaultBase: "http://localhost:8082", path: "/api/bewerbungen" },
+  php: {
+    label: "PHP / Apache",
+    defaultBase: "http://localhost:8080",
+    path: "/api.php",
+    stellenPath: "/api_stellen.php",
+  },
+  python: {
+    label: "Python / Flask",
+    defaultBase: "http://localhost:8001",
+    path: "/api/bewerbungen",
+    stellenPath: "/api_stellen",
+  },
+  node: {
+    label: "Node.js / Express",
+    defaultBase: "http://localhost:3000",
+    path: "/api/bewerbungen",
+    stellenPath: "/api_stellen",
+  },
+  dotnet: {
+    label: ".NET / ASP.NET Core",
+    defaultBase: "http://localhost:8082",
+    path: "/api/bewerbungen",
+    stellenPath: "/api_stellen",
+  },
 };
 
 const view = ref("bewerbung");
@@ -20,6 +40,11 @@ function onBackendChange() {
 const endpoint = computed(() => {
   const base = basisUrl.value.replace(/\/+$/, "");
   return base + BACKENDS[backendTyp.value].path;
+});
+
+const stellenEndpoint = computed(() => {
+  const base = basisUrl.value.replace(/\/+$/, "");
+  return base + BACKENDS[backendTyp.value].stellenPath;
 });
 
 const form = reactive({
@@ -130,6 +155,8 @@ function reset() {
       </div>
       <p class="muted" style="margin-top: 0.75rem;">
         Bewerbungs-Endpoint: <span class="endpoint-preview">{{ endpoint }}</span>
+        <br />
+        Stellen-Endpoint: <span class="endpoint-preview">{{ stellenEndpoint }}</span>
       </p>
     </section>
 
@@ -154,7 +181,7 @@ function reset() {
       </button>
     </nav>
 
-    <StellenangebotForm v-if="view === 'stelle'" :basis-url="basisUrl" />
+    <StellenangebotForm v-if="view === 'stelle'" :endpoint="stellenEndpoint" />
 
     <form v-if="view === 'bewerbung'" class="card" @submit.prevent="submit">
       <h2>Daten</h2>
