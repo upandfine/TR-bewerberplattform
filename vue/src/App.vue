@@ -1,5 +1,6 @@
 <script setup>
 import { computed, reactive, ref } from "vue";
+import StellenangebotForm from "./StellenangebotForm.vue";
 
 const BACKENDS = {
   php: { label: "PHP / Apache", defaultBase: "http://localhost:8080", path: "/api.php" },
@@ -8,6 +9,7 @@ const BACKENDS = {
   dotnet: { label: ".NET / ASP.NET Core", defaultBase: "http://localhost:8082", path: "/api/bewerbungen" },
 };
 
+const view = ref("bewerbung");
 const backendTyp = ref("php");
 const basisUrl = ref(BACKENDS.php.defaultBase);
 
@@ -99,9 +101,9 @@ function reset() {
 
 <template>
   <main class="shell">
-    <h1>Bewerbung einreichen</h1>
+    <h1>Bewerberplattform</h1>
     <p class="subtitle">
-      Sendet eine Bewerbung an eines der vier Backend-Beispiele (PHP, Python, Node, .NET).
+      Test-Frontend für die vier Backend-Beispiele (PHP, Python, Node, .NET).
     </p>
 
     <section class="card">
@@ -127,11 +129,34 @@ function reset() {
         </label>
       </div>
       <p class="muted" style="margin-top: 0.75rem;">
-        Endpoint: <span class="endpoint-preview">{{ endpoint }}</span>
+        Bewerbungs-Endpoint: <span class="endpoint-preview">{{ endpoint }}</span>
       </p>
     </section>
 
-    <form class="card" @submit.prevent="submit">
+    <nav class="tabs" role="tablist">
+      <button
+        type="button"
+        role="tab"
+        :aria-selected="view === 'bewerbung'"
+        :class="['tab', { active: view === 'bewerbung' }]"
+        @click="view = 'bewerbung'"
+      >
+        Bewerbung
+      </button>
+      <button
+        type="button"
+        role="tab"
+        :aria-selected="view === 'stelle'"
+        :class="['tab', { active: view === 'stelle' }]"
+        @click="view = 'stelle'"
+      >
+        Stellenangebot
+      </button>
+    </nav>
+
+    <StellenangebotForm v-if="view === 'stelle'" :basis-url="basisUrl" />
+
+    <form v-if="view === 'bewerbung'" class="card" @submit.prevent="submit">
       <h2>Daten</h2>
       <div class="grid grid-2">
         <label>
