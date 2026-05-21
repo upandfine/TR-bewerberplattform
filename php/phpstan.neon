@@ -1,0 +1,5 @@
+parameters:
+    # AP2-Startwert. Per CLI ueberschreibbar: --level=9
+    level: 5
+    paths:
+        - src

@@ -46,6 +46,7 @@ services:
       - ./php/src:/var/www/src
       - ./php/tests:/var/www/tests
       - ./php/phpunit.xml:/var/www/phpunit.xml
+      - ./php/phpstan.neon:/var/www/phpstan.neon
     environment:
       DB_HOST: db
       DB_NAME: ${MARIADB_DATABASE}
