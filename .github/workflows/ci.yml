@@ -1,0 +1,99 @@
+# ==============================================================
+# CI · Continuous Integration
+# ==============================================================
+# Zweck
+#   Sicherheitsnetz vor dem Merge. Bei jedem Push und jedem Pull
+#   Request laeuft Build + Test fuer den Node-Stack. Wird der Job
+#   rot, blockiert Branch Protection den Merge in main.
+#
+#   Diese Pipeline produziert KEIN Deploy-Artefakt — sie testet
+#   nur. Bauen-und-Pushen passiert in cd.yml, wenn der Code
+#   tatsaechlich in eine Umgebung soll.
+#
+# Wann laeuft sie?
+#   - Push auf jeden Branch AUSSER main / demo / Tags v*.
+#     Begruendung: main, demo und v* sind die CD-Trigger. Dort
+#     laufen die Tests ohnehin erneut — wir vermeiden Doppellaeufe.
+#   - Pull Request gegen main: das ist der eigentliche Gate-Lauf.
+#
+# Hinweis fuer die Schulung
+#   Das hier ist Demo-YAML. Die Tests im Repo liegen in
+#   node/tests/, das npm-Skript zeigt aber auf tests/*.test.js
+#   relativ zu node/app/. Eine echte Pipeline wuerde diesen
+#   Pfad-Mismatch beheben — wir zeigen hier nur die Mechanik.
+# ==============================================================
+
+name: CI
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - demo
+    tags-ignore:
+      - 'v*'
+  pull_request:
+    branches: [main]
+
+jobs:
+  # --------------------------------------------------------------
+  # Job 1: Tests
+  # --------------------------------------------------------------
+  test-node:
+    name: Node.js · Test
+    runs-on: ubuntu-latest
+
+    # Alle "run"-Schritte spielen im Node-Stack —
+    # Pfad einmal zentral setzen statt jedes Mal "cd node/app".
+    defaults:
+      run:
+        working-directory: node/app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Versionspin auf Node 22 — schuetzt davor, dass ein
+      # GitHub-Runner-Update die Build-Umgebung unter uns wegzieht.
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          # cache: 'npm' wuerde node_modules zwischen Laeufen
+          # cachen. Bewusst aus, weil dieses Demo kein
+          # package-lock.json pflegt — ohne Lockfile bringt der
+          # Cache nichts und verfaelscht im Zweifel das Ergebnis.
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        # Faellt dieser Schritt, scheitert der ganze Job — und
+        # damit der PR-Check. Genau so soll es sein.
+        run: npm test
+
+  # --------------------------------------------------------------
+  # Job 2: Docker-Probebau
+  # --------------------------------------------------------------
+  # Wir bauen das Image, pushen es aber NICHT. Damit faellt ein
+  # kaputtes Dockerfile schon im PR auf — nicht erst beim Deploy.
+  # --------------------------------------------------------------
+  build-image:
+    name: Docker · Probebau
+    runs-on: ubuntu-latest
+    needs: test-node   # nur bauen, wenn Tests gruen sind
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./node
+          push: false
+          # Sanity-Tag, nur lokal im Runner gueltig.
+          tags: train-node:ci-${{ github.sha }}

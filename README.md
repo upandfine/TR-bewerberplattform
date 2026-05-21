@@ -515,4 +515,18 @@ mit HTTP-Status und Details ausgegeben.
 > CORS: Alle vier Backends senden `Access-Control-Allow-Origin: *`,
 > damit der Browser den Cross-Origin-Request vom Vue-Container
 > (Port 5173) auf das Backend (8080/8001/3000/8082) erlaubt.
-# TR-bewerberplattform
+
+---
+
+## CI/CD-Demo
+
+Im Repo liegen zwei Beispiel-Workflows für GitHub Actions, die
+das klassische Drei-Stage-Modell **dev → demo → live** zeigen:
+
+- [.github/workflows/ci.yml](.github/workflows/ci.yml) — Tests
+  und Docker-Probebau bei jedem Push / PR.
+- [.github/workflows/cd.yml](.github/workflows/cd.yml) — Build,
+  Push nach GHCR, Deploy je Stage (live mit manuellem Gate).
+
+Ausführliche Erklärung inkl. Trigger-Modell, Setup-Schritten
+und Beispielen für echte Deploy-Befehle: [CICD.md](CICD.md).

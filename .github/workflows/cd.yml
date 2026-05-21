@@ -1,0 +1,223 @@
+# ==============================================================
+# CD · Continuous Deployment
+# ==============================================================
+# Drei Stages — drei Trigger:
+#
+#   Stage | Wann                          | Freigabe
+#   ----- | ----------------------------- | --------------------
+#   dev   | Push auf main                 | automatisch
+#   demo  | Push auf Branch "demo"        | automatisch
+#   live  | Push eines Tags "v*"          | manuell (Env-Gate)
+#
+# Ablauf pro Stage (immer gleich):
+#   1) resolve-stage   — welche Stage ist das ueberhaupt?
+#   2) build-and-push  — Tests + Image bauen + nach GHCR pushen
+#   3) deploy-<stage>  — eigentliches Ausrollen (hier simuliert)
+#
+# Was bedeutet "simuliert"?
+#   Der Deploy-Schritt ist ein `echo`. In einer echten Pipeline
+#   stuende dort z.B. eins von:
+#     - ssh <user>@dev.server 'docker compose pull && up -d'
+#     - kubectl set image deploy/api api=$IMAGE
+#     - fly deploy --image $IMAGE
+#     - az webapp config container set --docker-custom-image-name ...
+#   Welcher Befehl passt, haengt von der Zielinfrastruktur ab —
+#   die Pipeline-Struktur bleibt identisch.
+#
+# Manuelles Gate fuer live
+#   Das GitHub Environment "live" muss in den Repo-Settings unter
+#   Settings → Environments → live diese Schutzregeln bekommen:
+#     - Required reviewers: mindestens 1 Person
+#     - Deployment branches and tags: nur Tags "v*" erlaubt
+#   Damit pausiert der Deploy-Job, bis jemand in der UI klickt.
+# ==============================================================
+
+name: CD
+
+on:
+  push:
+    branches:
+      - main     # → dev
+      - demo     # → demo
+    tags:
+      - 'v*'     # → live (z.B. v1.0.0, v2.3.1-rc1)
+
+# Berechtigungen am Workflow-Anfang setzen, nach dem Prinzip
+# "least privilege" — wir geben nur das, was wir tatsaechlich
+# brauchen. read fuer den Code, write fuer Container-Pakete.
+permissions:
+  contents: read
+  packages: write
+
+env:
+  # Image-Name an EINER Stelle definieren, damit Build- und
+  # Deploy-Jobs garantiert denselben Pfad benutzen.
+  # ghcr.io/<owner>/<repo>/node — die GitHub Container Registry.
+  IMAGE_NAME: ghcr.io/${{ github.repository }}/node
+
+jobs:
+  # ============================================================
+  # 1) Stage-Erkennung
+  # ============================================================
+  # Welchen Stage loest dieser Lauf aus? Wir rechnen das EINMAL
+  # zentral aus und reichen das Ergebnis ueber Job-Outputs an
+  # alle nachgelagerten Jobs weiter. So bleibt die Logik an einer
+  # Stelle und Aenderungen sind sicher.
+  # ============================================================
+  resolve-stage:
+    name: Welche Stage?
+    runs-on: ubuntu-latest
+    outputs:
+      stage: ${{ steps.pick.outputs.stage }}
+      tag:   ${{ steps.pick.outputs.tag }}
+    steps:
+      - id: pick
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            # Tag-Push → live. Als Docker-Tag den Versions-Tag
+            # uebernehmen, damit man im Registry sieht, welche
+            # Version wo laeuft.
+            echo "stage=live" >> "$GITHUB_OUTPUT"
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_REF}" == "refs/heads/demo" ]]; then
+            echo "stage=demo" >> "$GITHUB_OUTPUT"
+            echo "tag=demo-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          else
+            echo "stage=dev" >> "$GITHUB_OUTPUT"
+            echo "tag=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ============================================================
+  # 2) Bauen & Pushen
+  # ============================================================
+  # Auch hier laufen die Tests nochmal. Klingt redundant — ist
+  # aber wichtig: zwischen "CI gruen im PR" und "Merge in main"
+  # kann etwas Anderes hereingerutscht sein (z.B. zwei PRs, die
+  # erst zusammen brechen). Nennt sich "defense in depth".
+  # ============================================================
+  build-and-push:
+    name: Build & Push → GHCR
+    needs: resolve-stage
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install & Test
+        working-directory: node/app
+        run: |
+          npm install
+          npm test
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Beim Push nach GHCR benutzen wir das automatisch bereit-
+      # gestellte GITHUB_TOKEN. Wir muessen KEIN Secret pflegen.
+      - name: Login zu GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./node
+          push: true
+          # Wir setzen ZWEI Tags pro Image:
+          #   - eindeutig (z.B. dev-a1b2c3d / v1.2.0) — fuer
+          #     reproduzierbare Deploys und Rollbacks
+          #   - rollend  (dev / demo / live)         — fuer
+          #     "gib mir immer das aktuellste in Stage X"
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ needs.resolve-stage.outputs.tag }}
+            ${{ env.IMAGE_NAME }}:${{ needs.resolve-stage.outputs.stage }}
+          # Build-Cache ueber die GitHub-Actions-Cache-API.
+          # Spart bei kleinen Aenderungen oft mehrere Minuten,
+          # weil unveraenderte Docker-Layer wiederverwendet werden.
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+  # ============================================================
+  # 3a) Deploy → dev
+  # ============================================================
+  # Schnell, billig, instabil erlaubt. Hier landen halbgare
+  # Features, damit Entwickler sie auf einer echten Umgebung
+  # ausprobieren koennen.
+  # ============================================================
+  deploy-dev:
+    name: Deploy → dev
+    needs: [resolve-stage, build-and-push]
+    if: needs.resolve-stage.outputs.stage == 'dev'
+    runs-on: ubuntu-latest
+    environment:
+      # GitHub-Environment "dev" muss unter Settings → Environments
+      # angelegt sein — dann erscheinen Deployments in der UI mit
+      # History, Logs und (optional) Schutzregeln.
+      name: dev
+      url: https://dev.example.com
+
+    steps:
+      - name: Deploy auf dev (Simulation)
+        run: |
+          echo "🚀 Stage: dev"
+          echo "Image:  ${{ env.IMAGE_NAME }}:${{ needs.resolve-stage.outputs.tag }}"
+          echo ""
+          echo "In echt wuerde hier z.B. laufen:"
+          echo "  ssh deploy@dev.example.com \\"
+          echo "    'docker compose pull && docker compose up -d'"
+
+  # ============================================================
+  # 3b) Deploy → demo
+  # ============================================================
+  # Stakeholder-Buehne: Vertrieb, UAT, Praesentationen. Bekommt
+  # Code, der bereits auf dev validiert wurde. Typischer Workflow:
+  # main → demo per fast-forward mergen, wenn ein Featurestand
+  # vorzeigbar ist.
+  # ============================================================
+  deploy-demo:
+    name: Deploy → demo
+    needs: [resolve-stage, build-and-push]
+    if: needs.resolve-stage.outputs.stage == 'demo'
+    runs-on: ubuntu-latest
+    environment:
+      name: demo
+      url: https://demo.example.com
+
+    steps:
+      - name: Deploy auf demo (Simulation)
+        run: |
+          echo "🚀 Stage: demo"
+          echo "Image:  ${{ env.IMAGE_NAME }}:${{ needs.resolve-stage.outputs.tag }}"
+
+  # ============================================================
+  # 3c) Deploy → live
+  # ============================================================
+  # Produktion. Wird NUR durch einen Versions-Tag ausgeloest
+  # (z.B. "git tag v1.2.0 && git push --tags"). Das Environment
+  # "live" haelt den Job an, bis ein Reviewer in der GitHub-UI
+  # auf "Approve" klickt — das ist das vier-Augen-Prinzip,
+  # technisch erzwungen.
+  # ============================================================
+  deploy-live:
+    name: Deploy → live
+    needs: [resolve-stage, build-and-push]
+    if: needs.resolve-stage.outputs.stage == 'live'
+    runs-on: ubuntu-latest
+    environment:
+      name: live
+      url: https://app.example.com
+
+    steps:
+      - name: Deploy auf live (Simulation)
+        run: |
+          echo "🚀 Stage: live (Version: ${{ github.ref_name }})"
+          echo "Image:  ${{ env.IMAGE_NAME }}:${{ needs.resolve-stage.outputs.tag }}"
+          echo ""
+          echo "Hinweis: dieser Job lief erst nach manueller"
+          echo "Freigabe im GitHub-Environment 'live'."
