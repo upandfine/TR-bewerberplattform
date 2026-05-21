@@ -16,6 +16,20 @@ __pycache__/
 dotnet/**/bin/
 dotnet/**/obj/
 
+# Java / Kotlin (Maven) build-Output
+java/target/
+java/**/target/
+kotlin/target/
+kotlin/**/target/
+*.class
+
+# Go (Module-Cache liegt im Container; lokales vendor/ wenn ueberhaupt)
+go/vendor/
+
+# Ruby (Bundler-Cache liegt im Container; lokales .bundle wenn ueberhaupt)
+ruby/.bundle/
+ruby/vendor/bundle/
+
 # Betriebssystem-Müll
 .DS_Store
 Thumbs.db

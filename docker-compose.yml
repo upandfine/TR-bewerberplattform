@@ -166,6 +166,101 @@ services:
       db:
         condition: service_healthy
 
+  # ----------------------------------------------------------
+  #  Java 21 (Spring Boot)
+  #  Code: ./java  ->  http://localhost:8083
+  # ----------------------------------------------------------
+  java:
+    build: ./java
+    container_name: train-java
+    restart: unless-stopped
+    ports:
+      - "${JAVA_PORT}:8080"
+    volumes:
+      - ./java:/work
+    environment:
+      DB_HOST: db
+      DB_NAME: ${MARIADB_DATABASE}
+      DB_USER: ${MARIADB_USER}
+      DB_PASS: ${MARIADB_PASSWORD}
+      # Maven-Cache AUSSERHALB des Bind-Mount (/work) -> ueberdauert Builds.
+      MAVEN_OPTS: "-Dmaven.repo.local=/maven-cache"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ----------------------------------------------------------
+  #  Kotlin 2 (Ktor)
+  #  Code: ./kotlin  ->  http://localhost:8084
+  # ----------------------------------------------------------
+  kotlin:
+    build: ./kotlin
+    container_name: train-kotlin
+    restart: unless-stopped
+    ports:
+      - "${KOTLIN_PORT}:8080"
+    volumes:
+      - ./kotlin:/work
+    environment:
+      DB_HOST: db
+      DB_NAME: ${MARIADB_DATABASE}
+      DB_USER: ${MARIADB_USER}
+      DB_PASS: ${MARIADB_PASSWORD}
+      MAVEN_OPTS: "-Dmaven.repo.local=/maven-cache"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ----------------------------------------------------------
+  #  Go 1.23 (chi-Router + database/sql)
+  #  Code: ./go  ->  http://localhost:8085
+  # ----------------------------------------------------------
+  go:
+    build: ./go
+    container_name: train-go
+    restart: unless-stopped
+    ports:
+      - "${GO_PORT}:8080"
+    volumes:
+      - ./go:/work
+    environment:
+      DB_HOST: db
+      DB_NAME: ${MARIADB_DATABASE}
+      DB_USER: ${MARIADB_USER}
+      DB_PASS: ${MARIADB_PASSWORD}
+      # Modul- und Build-Cache AUSSERHALB des Bind-Mount.
+      GOPATH: /go-cache
+      GOCACHE: /go-build-cache
+      GOFLAGS: -mod=mod
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ----------------------------------------------------------
+  #  Ruby 3.3 (Sinatra)
+  #  Code: ./ruby  ->  http://localhost:8086
+  # ----------------------------------------------------------
+  ruby:
+    build: ./ruby
+    container_name: train-ruby
+    restart: unless-stopped
+    ports:
+      - "${RUBY_PORT}:8080"
+    volumes:
+      - ./ruby:/app
+    environment:
+      DB_HOST: db
+      DB_NAME: ${MARIADB_DATABASE}
+      DB_USER: ${MARIADB_USER}
+      DB_PASS: ${MARIADB_PASSWORD}
+      # Bundle-Cache AUSSERHALB des Bind-Mount.
+      BUNDLE_PATH: /bundle-cache
+      BUNDLE_BIN: /bundle-cache/bin
+      PATH: /bundle-cache/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   db_data:
   nocodb_data:

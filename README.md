@@ -9,15 +9,19 @@ damit es ohne lange Einrichtung läuft.
 
 ## 1. Was ist enthalten?
 
-| Container    | Technologie        | Adresse im Browser              |
-|--------------|--------------------|---------------------------------|
-| `db`         | MariaDB 11         | (nur intern, Port 3306)         |
-| `php`        | PHP 8.4 + Apache   | http://localhost:8080           |
-| `python`     | Python 3.12 (Flask)| http://localhost:8001           |
-| `node`       | Node.js 22 (Express)| http://localhost:3000          |
-| `dotnet`     | .NET 9 / ASP.NET Core| http://localhost:8082         |
-| `phpmyadmin` | phpMyAdmin         | http://localhost:8081           |
-| `nocodb`     | NocoDB (Daten-UI)  | http://localhost:8090           |
+| Container    | Technologie            | Adresse im Browser              |
+|--------------|------------------------|---------------------------------|
+| `db`         | MariaDB 11             | (nur intern, Port 3306)         |
+| `php`        | PHP 8.4 + Apache       | http://localhost:8080           |
+| `python`     | Python 3.12 (Flask)    | http://localhost:8001           |
+| `node`       | Node.js 22 (Express)   | http://localhost:3000           |
+| `dotnet`     | .NET 9 / ASP.NET Core  | http://localhost:8082           |
+| `java`       | Java 21 / Spring Boot  | http://localhost:8083           |
+| `kotlin`     | Kotlin 2 / Ktor        | http://localhost:8084           |
+| `go`         | Go 1.23 / chi          | http://localhost:8085           |
+| `ruby`       | Ruby 3.3 / Sinatra     | http://localhost:8086           |
+| `phpmyadmin` | phpMyAdmin             | http://localhost:8081           |
+| `nocodb`     | NocoDB (Daten-UI)      | http://localhost:8090           |
 
 Die Ports lassen sich in der Datei `.env` ändern, falls einer
 auf deinem Rechner schon belegt ist.
@@ -275,46 +279,83 @@ als Board (sehr anschaulich).
 
 ---
 
-## 6c. Derselbe Durchstich in Python, Node und C#
+## 6c. Derselbe Durchstich in acht Sprachen
 
-Exakt dieselbe Architektur und API wie 6a – einmal in
-**Python/Flask** (`python/app/`), einmal in **Node.js/Express**
-(`node/app/`) und einmal in **C# / ASP.NET Core 9**
-(`dotnet/src/Bewerbung.Api/`), jeweils gegen dieselbe
-`bewerbung_db`. Ideal zum Sprachvergleich in der Schulung.
+Exakt dieselbe Architektur und API wie 6a – einmal je Stack, alle
+gegen dieselbe `bewerbung_db`. Ideal zum Sprachvergleich in der
+Schulung: identische drei Schichten, identischer JSON-Vertrag,
+identische Test-Sorten (Unit ohne DB, Integration gegen echte DB,
+API über HTTP).
 
-| Schicht | Python (`python/app/`) | Node (`node/app/`) | C# (`dotnet/src/Bewerbung.Api/`) |
-|---|---|---|---|
-| HTTP | `app.py` | `server.js` | `Program.cs` |
-| Use-Case | `service.py` | `service.js` | `BewerbungService.cs` |
-| Persistenz | `repository.py` | `repository.js` | `MySqlBewerbungRepository.cs` |
-| Naht (Interface) | `BewerbungRepository` (Protocol) | Duck-Typing / Fake | `IBewerbungRepository` |
+| Stack | Port | HTTP | Use-Case | Persistenz | Interface |
+|---|---|---|---|---|---|
+| PHP 8.4 / Apache       | 8080 | `php/www/api.php` | `php/src/BewerbungService.php` | `php/src/PdoBewerbungRepository.php` | `BewerbungRepositoryInterface.php` |
+| Python 3.12 / Flask    | 8001 | `python/app/app.py` | `python/app/service.py` | `python/app/repository.py` | `BewerbungRepository` (Protocol) |
+| Node.js 22 / Express   | 3000 | `node/app/server.js` | `node/app/service.js` | `node/app/repository.js` | Duck-Typing / Fake |
+| .NET 9 / ASP.NET Core  | 8082 | `dotnet/src/Bewerbung.Api/Program.cs` | `dotnet/src/Bewerbung.Api/BewerbungService.cs` | `dotnet/src/Bewerbung.Api/MySqlBewerbungRepository.cs` | `IBewerbungRepository.cs` |
+| Java 21 / Spring Boot  | 8083 | `java/src/main/java/de/train/bewerbung/BewerbungController.java` | `java/src/main/java/de/train/bewerbung/BewerbungService.java` | `java/src/main/java/de/train/bewerbung/JdbcBewerbungRepository.java` | `BewerbungRepository.java` |
+| Kotlin 2 / Ktor        | 8084 | `kotlin/src/main/kotlin/de/train/bewerbung/App.kt` | `kotlin/src/main/kotlin/de/train/bewerbung/Service.kt` | `kotlin/src/main/kotlin/de/train/bewerbung/Repository.kt` | `BewerbungRepository` (interface in `Repository.kt`) |
+| Go 1.23 / chi          | 8085 | `go/app/server.go` | `go/app/service.go` | `go/app/repository.go` | `BewerbungRepository` (interface in `repository.go`) |
+| Ruby 3.3 / Sinatra     | 8086 | `ruby/app/app.rb` | `ruby/app/service.rb` | `ruby/app/repository.rb` | Duck-Typing / Fake |
+
+> Kotlin-Wahl: **Ktor** statt Spring Boot — leichter, schnellerer
+> Start im Container, kein Reflection-/Annotation-Overhead.
+> Spring Boot deckt der Java-Stack bereits ab; Ktor zeigt einen
+> dazu kontrastierenden "leichtgewichtigen" Ansatz.
 
 Endpunkte (identischer JSON-Vertrag, snake_case-Ausgabe):
 
 ```bash
-# Python  ->  Port 8001
+# PHP        ->  Port 8080 (Endpoint hier: /api.php)
+curl -X POST http://localhost:8080/api.php \
+  -H 'Content-Type: application/json' \
+  -d '{"vorname":"Erika","nachname":"Mustermann","email":"e@example.com","stelle_id":1}'
+
+# Python     ->  Port 8001
 curl -X POST http://localhost:8001/api/bewerbungen \
   -H 'Content-Type: application/json' \
   -d '{"vorname":"Erika","nachname":"Mustermann","email":"e@example.com","stelle_id":1}'
-curl http://localhost:8001/api/bewerbungen
 
-# Node    ->  Port 3000
+# Node       ->  Port 3000
 curl -X POST http://localhost:3000/api/bewerbungen \
   -H 'Content-Type: application/json' \
   -d '{"vorname":"Erika","nachname":"Mustermann","email":"e@example.com","stelle_id":1}'
-curl http://localhost:3000/api/bewerbungen
 
-# C# / .NET 9  ->  Port 8082
+# C# / .NET  ->  Port 8082
 curl -X POST http://localhost:8082/api/bewerbungen \
   -H 'Content-Type: application/json' \
   -d '{"vorname":"Erika","nachname":"Mustermann","email":"e@example.com","stelle_id":1}'
-curl http://localhost:8082/api/bewerbungen
+
+# Java       ->  Port 8083
+curl -X POST http://localhost:8083/api/bewerbungen \
+  -H 'Content-Type: application/json' \
+  -d '{"vorname":"Erika","nachname":"Mustermann","email":"e@example.com","stelle_id":1}'
+
+# Kotlin     ->  Port 8084
+curl -X POST http://localhost:8084/api/bewerbungen \
+  -H 'Content-Type: application/json' \
+  -d '{"vorname":"Erika","nachname":"Mustermann","email":"e@example.com","stelle_id":1}'
+
+# Go         ->  Port 8085
+curl -X POST http://localhost:8085/api/bewerbungen \
+  -H 'Content-Type: application/json' \
+  -d '{"vorname":"Erika","nachname":"Mustermann","email":"e@example.com","stelle_id":1}'
+
+# Ruby       ->  Port 8086
+curl -X POST http://localhost:8086/api/bewerbungen \
+  -H 'Content-Type: application/json' \
+  -d '{"vorname":"Erika","nachname":"Mustermann","email":"e@example.com","stelle_id":1}'
+
+# Auflisten (gleiche Pfade, GET):
+curl http://localhost:8001/api/bewerbungen
 ```
 
-Tests (Unit ohne DB, Integration gegen echte DB, API über HTTP):
+Tests pro Stack (Unit ohne DB, Integration gegen echte DB, API über HTTP):
 
 ```bash
+# PHP: PHPUnit
+docker compose exec php php vendor/bin/phpunit --testdox
+
 # Python: pytest
 docker compose exec python python -m pytest -q tests
 
@@ -323,10 +364,25 @@ docker compose exec node npm test
 
 # C#: xUnit
 docker compose exec -w /work dotnet dotnet test tests/Bewerbung.Tests --nologo
+
+# Java: JUnit 5 (Maven Surefire)
+docker compose exec -w /work java mvn -B -Dmaven.repo.local=/maven-cache test
+
+# Kotlin: JUnit 5 (Maven Surefire)
+docker compose exec -w /work kotlin mvn -B -Dmaven.repo.local=/maven-cache test
+
+# Go: Unit (ohne DB)
+docker compose exec -w /work go go test ./app/...
+# Go: Integration + API (mit Build-Tag "integration")
+docker compose exec -w /work go go test -tags=integration ./app/...
+
+# Ruby: Minitest (alle Tests)
+docker compose exec -w /app ruby bundle exec rake test
 ```
 
 > Hinweis: Code-Änderungen werden nach
-> `docker compose restart python` / `node` / `dotnet` aktiv.
+> `docker compose restart <service>` aktiv (z. B. `python`, `node`,
+> `dotnet`, `java`, `kotlin`, `go`, `ruby`).
 
 ---
 
@@ -389,6 +445,24 @@ docker compose down -v
 │   ├── Dockerfile
 │   ├── src/Bewerbung.Api/   # ASP.NET Core Minimal API (siehe 6c)
 │   └── tests/Bewerbung.Tests/  # xUnit
+├── java/
+│   ├── Dockerfile
+│   ├── pom.xml          # Maven + Spring Boot 3.4
+│   └── src/             # main/java + test/java (JUnit 5)
+├── kotlin/
+│   ├── Dockerfile
+│   ├── pom.xml          # Maven + Ktor 2.3
+│   └── src/             # main/kotlin + test/kotlin (JUnit 5)
+├── go/
+│   ├── Dockerfile
+│   ├── go.mod / go.sum
+│   └── app/             # main-Paket inkl. *_test.go (Unit + Integration)
+├── ruby/
+│   ├── Dockerfile
+│   ├── Gemfile / Gemfile.lock
+│   ├── Rakefile
+│   ├── app/             # Sinatra-App (config.ru, app.rb, service.rb, ...)
+│   └── tests/           # Minitest
 └── sql/
     ├── init/init_bewerbung.sql  # Schema + Demo, automatisch beim 1. Start
     └── scripts/
